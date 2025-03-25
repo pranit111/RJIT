@@ -1,0 +1,23 @@
+{% extends 'main/base.html' %}
+
+{% block content %}
+<h2>Select Your Condition</h2>
+<p>Please select your condition to help us provide better support:</p>
+
+<form method="post">
+    {% csrf_token %}
+    <div>
+        <input type="radio" name="condition_type" value="none" id="none">
+        <label for="none">No Specific Condition</label>
+    </div>
+    <div>
+        <input type="radio" name="condition_type" value="dyslexia" id="dyslexia">
+        <label for="dyslexia">Dyslexia</label>
+    </div>
+    <div>
+        <input type="radio" name="condition_type" value="autism" id="autism">
+        <label for="autism">Autism</label>
+    </div>
+    <button type="submit">Continue</button>
+</form>
+{% endblock %} 

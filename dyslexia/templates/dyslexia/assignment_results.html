@@ -1,0 +1,333 @@
+{% extends 'dyslexia/base.html' %}
+{% load static %}
+
+{% block dyslexia_content %}
+<div class="container">
+    <div class="results-header">
+        <h1>Assignment Results</h1>
+        <h2>{{ assignment.title }}</h2>
+        <p class="subtitle">{{ assignment.get_assignment_type_display }}</p>
+    </div>
+
+    <div class="results-summary">
+        <div class="score-card">
+            <div class="score-circle">
+                <span class="score-value">{{ submission.score }}%</span>
+                <span class="score-label">Score</span>
+            </div>
+            <div class="score-details">
+                <div class="detail-item">
+                    <span class="label">Correct Answers:</span>
+                    <span class="value">{{ submission.responses.filter(is_correct=True).count }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Total Questions:</span>
+                    <span class="value">{{ submission.responses.count }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Submitted:</span>
+                    <span class="value">{{ submission.submitted_at|date:"M d, Y H:i" }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="questions-review">
+        <h3>Question Review</h3>
+        {% for response in responses %}
+        <div class="question-card {% if response.is_correct %}correct{% else %}incorrect{% endif %}">
+            <div class="question-header">
+                <span class="question-number">Question {{ forloop.counter }}</span>
+                <span class="result-badge {% if response.is_correct %}correct{% else %}incorrect{% endif %}">
+                    {% if response.is_correct %}Correct{% else %}Incorrect{% endif %}
+                </span>
+            </div>
+
+            <div class="question-content">
+                <div class="question-text">
+                    {{ response.question.text }}
+                </div>
+
+                {% if response.question.question_type == 'image' and response.question.image %}
+                <div class="question-image">
+                    <img src="{{ response.question.image.url }}" alt="Question Image">
+                </div>
+                {% endif %}
+
+                <div class="options-review">
+                    {% for option in response.question.options.all %}
+                    <div class="option {% if option.id == response.selected_option.id %}selected{% endif %} {% if option.is_correct %}correct{% endif %}">
+                        <span class="option-text">{{ option.text }}</span>
+                        {% if option.id == response.selected_option.id %}
+                            <span class="selection-indicator">Your Answer</span>
+                        {% endif %}
+                        {% if option.is_correct %}
+                            <span class="correct-indicator">Correct Answer</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% if not response.is_correct and response.selected_option.explanation %}
+                <div class="explanation">
+                    <h4>Explanation:</h4>
+                    <p>{{ response.selected_option.explanation }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="action-buttons">
+        <a href="{% url 'dyslexia:assignments_list' %}" class="btn btn-secondary">Back to Assignments</a>
+        {% if assignment.assignment_type == 'practice' %}
+        <a href="{% url 'dyslexia:take_assignment' assignment.id %}" class="btn btn-primary">Retry Assignment</a>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .results-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .results-header h1 {
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+
+    .results-header h2 {
+        color: #2196f3;
+        margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+        color: #666;
+        font-size: 1.1rem;
+    }
+
+    .results-summary {
+        margin-bottom: 3rem;
+    }
+
+    .score-card {
+        background: white;
+        border-radius: 10px;
+        padding: 2rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+    }
+
+    .score-circle {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        background: #e3f2fd;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: #2196f3;
+    }
+
+    .score-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+    }
+
+    .score-label {
+        font-size: 1.1rem;
+    }
+
+    .score-details {
+        flex: 1;
+    }
+
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        color: #666;
+    }
+
+    .detail-item .label {
+        font-weight: 500;
+    }
+
+    .questions-review {
+        margin-bottom: 2rem;
+    }
+
+    .questions-review h3 {
+        color: #2c3e50;
+        margin-bottom: 1.5rem;
+    }
+
+    .question-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border-left: 4px solid #ddd;
+    }
+
+    .question-card.correct {
+        border-left-color: #4caf50;
+    }
+
+    .question-card.incorrect {
+        border-left-color: #f44336;
+    }
+
+    .question-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .question-number {
+        color: #666;
+        font-size: 0.9rem;
+    }
+
+    .result-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 15px;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .result-badge.correct {
+        background-color: #e8f5e9;
+        color: #4caf50;
+    }
+
+    .result-badge.incorrect {
+        background-color: #ffebee;
+        color: #f44336;
+    }
+
+    .question-text {
+        font-size: 1.2rem;
+        color: #2c3e50;
+        margin-bottom: 1rem;
+        line-height: 1.6;
+    }
+
+    .question-image {
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+
+    .question-image img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 5px;
+    }
+
+    .options-review {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .option {
+        padding: 1rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 5px;
+        position: relative;
+    }
+
+    .option.selected {
+        border-color: #2196f3;
+        background-color: #e3f2fd;
+    }
+
+    .option.correct {
+        border-color: #4caf50;
+        background-color: #e8f5e9;
+    }
+
+    .option-text {
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .selection-indicator,
+    .correct-indicator {
+        position: absolute;
+        right: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 0.9rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 3px;
+    }
+
+    .selection-indicator {
+        background-color: #2196f3;
+        color: white;
+    }
+
+    .correct-indicator {
+        background-color: #4caf50;
+        color: white;
+    }
+
+    .explanation {
+        margin-top: 1rem;
+        padding: 1rem;
+        background-color: #f5f5f5;
+        border-radius: 5px;
+    }
+
+    .explanation h4 {
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+
+    .explanation p {
+        color: #666;
+        line-height: 1.5;
+    }
+
+    .action-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 5px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: background-color 0.2s;
+    }
+
+    .btn-primary {
+        background-color: #2196f3;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background-color: #1976d2;
+    }
+
+    .btn-secondary {
+        background-color: #f5f5f5;
+        color: #333;
+    }
+
+    .btn-secondary:hover {
+        background-color: #e0e0e0;
+    }
+</style>
+{% endblock %} 

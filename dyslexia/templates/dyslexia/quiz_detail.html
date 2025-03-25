@@ -1,0 +1,289 @@
+{% extends 'main/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="quiz-container">
+    <div class="quiz-header">
+        <h1>{{ quiz.title }}</h1>
+        <div class="quiz-meta">
+            <span><i class="fas fa-clock"></i> {{ quiz.duration }} minutes</span>
+            <span><i class="fas fa-question-circle"></i> {{ quiz.questions.count }} questions</span>
+            <span><i class="fas fa-trophy"></i> Pass mark: {{ quiz.pass_mark }}%</span>
+        </div>
+    </div>
+
+    <div class="quiz-content">
+        <form id="quizForm" method="POST" action="{% url 'dyslexia:submit_quiz' quiz.id %}">
+            {% csrf_token %}
+            
+            {% for question in quiz.questions.all %}
+            <div class="question-card" data-question="{{ forloop.counter }}">
+                <div class="question-header">
+                    <span class="question-number">Question {{ forloop.counter }}</span>
+                    <span class="question-type">{{ question.get_question_type_display }}</span>
+                </div>
+
+                <div class="question-content">
+                    {% if question.image %}
+                    <div class="question-image">
+                        <img src="{{ question.image.url }}" alt="Question Image">
+                    </div>
+                    {% endif %}
+
+                    <div class="question-text">
+                        <p>{{ question.text }}</p>
+                        {% if question.question_type == 'text_to_speech' %}
+                        <button type="button" class="speak-button" data-text="{{ question.text }}">
+                            <i class="fas fa-volume-up"></i> Listen
+                        </button>
+                        {% endif %}
+                    </div>
+
+                    <div class="options">
+                        {% for option in question.options.all %}
+                        <label class="option">
+                            <input type="radio" name="q{{ question.id }}" value="{{ option.id }}" required>
+                            <span class="option-text">{{ option.text }}</span>
+                            {% if question.question_type == 'text_to_speech' %}
+                            <button type="button" class="speak-option" data-text="{{ option.text }}">
+                                <i class="fas fa-volume-up"></i>
+                            </button>
+                            {% endif %}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            <div class="quiz-navigation">
+                <button type="button" id="prevQuestion" class="nav-button" disabled>
+                    <i class="fas fa-arrow-left"></i> Previous
+                </button>
+                <div class="question-progress">
+                    Question <span id="currentQuestion">1</span> of {{ quiz.questions.count }}
+                </div>
+                <button type="button" id="nextQuestion" class="nav-button">
+                    Next <i class="fas fa-arrow-right"></i>
+                </button>
+                <button type="submit" id="submitQuiz" class="submit-button" style="display: none;">
+                    Submit Quiz
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .quiz-container {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 20px;
+    }
+
+    .quiz-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .quiz-meta {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-top: 10px;
+        color: #666;
+    }
+
+    .question-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        display: none;
+    }
+
+    .question-card.active {
+        display: block;
+    }
+
+    .question-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .question-number {
+        font-weight: bold;
+        color: #6e8efb;
+    }
+
+    .question-type {
+        background: #f0f4ff;
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-size: 0.9em;
+        color: #6e8efb;
+    }
+
+    .question-image {
+        margin: 20px 0;
+        text-align: center;
+    }
+
+    .question-image img {
+        max-width: 100%;
+        border-radius: 8px;
+    }
+
+    .options {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-top: 20px;
+    }
+
+    .option {
+        display: flex;
+        align-items: center;
+        padding: 15px;
+        border: 1px solid #eee;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+
+    .option:hover {
+        background: #f8f9fa;
+    }
+
+    .option input[type="radio"] {
+        margin-right: 15px;
+    }
+
+    .speak-button, .speak-option {
+        background: none;
+        border: none;
+        color: #6e8efb;
+        cursor: pointer;
+        padding: 5px 10px;
+        margin-left: 10px;
+    }
+
+    .quiz-navigation {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+    }
+
+    .nav-button {
+        background: #6e8efb;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .nav-button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+
+    .submit-button {
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 10px 30px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1.1em;
+    }
+
+    .question-progress {
+        color: #666;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const questions = document.querySelectorAll('.question-card');
+    const prevButton = document.getElementById('prevQuestion');
+    const nextButton = document.getElementById('nextButton');
+    const submitButton = document.getElementById('submitQuiz');
+    const currentQuestionSpan = document.getElementById('currentQuestion');
+    let currentQuestion = 0;
+
+    // Initialize speech synthesis
+    const synth = window.speechSynthesis;
+    
+    // Function to speak text
+    function speakText(text) {
+        synth.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        synth.speak(utterance);
+    }
+
+    // Add click handlers for speak buttons
+    document.querySelectorAll('.speak-button, .speak-option').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const textToSpeak = this.dataset.text;
+            speakText(textToSpeak);
+        });
+    });
+
+    function showQuestion(index) {
+        questions.forEach((q, i) => {
+            q.style.display = i === index ? 'block' : 'none';
+        });
+        currentQuestionSpan.textContent = index + 1;
+        
+        // Update button states
+        prevButton.disabled = index === 0;
+        nextButton.style.display = index === questions.length - 1 ? 'none' : 'block';
+        submitButton.style.display = index === questions.length - 1 ? 'block' : 'none';
+    }
+
+    // Show first question initially
+    showQuestion(0);
+
+    // Navigation handlers
+    prevButton.addEventListener('click', () => {
+        if (currentQuestion > 0) {
+            currentQuestion--;
+            showQuestion(currentQuestion);
+        }
+    });
+
+    nextButton.addEventListener('click', () => {
+        if (currentQuestion < questions.length - 1) {
+            currentQuestion++;
+            showQuestion(currentQuestion);
+        }
+    });
+
+    // Form submission handler
+    document.getElementById('quizForm').addEventListener('submit', function(e) {
+        const unanswered = Array.from(questions).some(question => {
+            const inputs = question.querySelectorAll('input[type="radio"]');
+            return !Array.from(inputs).some(input => input.checked);
+        });
+
+        if (unanswered) {
+            e.preventDefault();
+            alert('Please answer all questions before submitting.');
+        }
+    });
+});
+</script>
+{% endblock %} 

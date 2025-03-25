@@ -1,0 +1,312 @@
+{% extends 'dyslexia/base.html' %}
+{% load static %}
+
+{% block dyslexia_content %}
+<div class="container">
+    <div class="assignment-header">
+        <h1>{{ assignment.title }}</h1>
+        <p class="subtitle">{{ assignment.get_assignment_type_display }}</p>
+    </div>
+
+    <div class="assignment-container">
+        <div class="progress-bar">
+            <div class="progress" id="progressBar"></div>
+        </div>
+
+        <div class="question-container">
+            {% for question in questions %}
+            <div class="question-card" data-question-id="{{ question.id }}" style="display: {% if forloop.first %}block{% else %}none{% endif %}">
+                <div class="question-header">
+                    <span class="question-number">Question {{ forloop.counter }} of {{ questions|length }}</span>
+                </div>
+
+                <div class="question-content">
+                    {% if question.question_type == 'image' and question.image %}
+                    <div class="question-image">
+                        <img src="{{ question.image.url }}" alt="Question Image">
+                    </div>
+                    {% endif %}
+
+                    <div class="question-text">
+                        {{ question.text }}
+                    </div>
+
+                    <div class="options-container">
+                        {% for option in question.options.all %}
+                        <div class="option">
+                            <input type="radio" 
+                                   name="question_{{ question.id }}" 
+                                   value="{{ option.id }}" 
+                                   id="option_{{ option.id }}"
+                                   class="option-input">
+                            <label for="option_{{ option.id }}" class="option-label">
+                                {{ option.text }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="navigation-buttons">
+            <button id="prevBtn" class="nav-btn" style="display: none;">Previous</button>
+            <button id="nextBtn" class="nav-btn">Next</button>
+            <button id="submitBtn" class="nav-btn submit-btn" style="display: none;">Submit Assignment</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .assignment-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .assignment-header h1 {
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+        color: #666;
+        font-size: 1.1rem;
+    }
+
+    .assignment-container {
+        background: white;
+        border-radius: 10px;
+        padding: 2rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .progress-bar {
+        height: 10px;
+        background-color: #f5f5f5;
+        border-radius: 5px;
+        margin-bottom: 2rem;
+        overflow: hidden;
+    }
+
+    .progress {
+        height: 100%;
+        background-color: #2196f3;
+        width: 0;
+        transition: width 0.3s ease;
+    }
+
+    .question-card {
+        margin-bottom: 2rem;
+    }
+
+    .question-header {
+        margin-bottom: 1rem;
+    }
+
+    .question-number {
+        color: #666;
+        font-size: 0.9rem;
+    }
+
+    .question-content {
+        margin-bottom: 2rem;
+    }
+
+    .question-image {
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+
+    .question-image img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 5px;
+    }
+
+    .question-text {
+        font-size: 1.2rem;
+        color: #2c3e50;
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+    }
+
+    .options-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .option {
+        display: flex;
+        align-items: center;
+        padding: 1rem;
+        border: 2px solid #e0e0e0;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .option:hover {
+        border-color: #2196f3;
+        background-color: #f5f5f5;
+    }
+
+    .option.selected {
+        border-color: #2196f3;
+        background-color: #e3f2fd;
+    }
+
+    .option-input {
+        display: none;
+    }
+
+    .option-label {
+        flex: 1;
+        margin-left: 1rem;
+        cursor: pointer;
+        font-size: 1.1rem;
+    }
+
+    .navigation-buttons {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 2rem;
+    }
+
+    .nav-btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 5px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .nav-btn:not(.submit-btn) {
+        background-color: #f5f5f5;
+        color: #333;
+    }
+
+    .nav-btn:not(.submit-btn):hover {
+        background-color: #e0e0e0;
+    }
+
+    .submit-btn {
+        background-color: #4caf50;
+        color: white;
+    }
+
+    .submit-btn:hover {
+        background-color: #388e3c;
+    }
+</style>
+
+<script>
+    let currentQuestion = 0;
+    const questions = document.querySelectorAll('.question-card');
+    const progressBar = document.getElementById('progressBar');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    let responses = [];
+
+    function updateProgress() {
+        const progress = ((currentQuestion + 1) / questions.length) * 100;
+        progressBar.style.width = `${progress}%`;
+    }
+
+    function showQuestion(index) {
+        questions.forEach((q, i) => {
+            q.style.display = i === index ? 'block' : 'none';
+        });
+
+        prevBtn.style.display = index === 0 ? 'none' : 'block';
+        nextBtn.style.display = index === questions.length - 1 ? 'none' : 'block';
+        submitBtn.style.display = index === questions.length - 1 ? 'block' : 'none';
+
+        updateProgress();
+    }
+
+    function saveResponse() {
+        const question = questions[currentQuestion];
+        const selectedOption = question.querySelector('input[type="radio"]:checked');
+        
+        if (selectedOption) {
+            responses[currentQuestion] = {
+                question_id: question.dataset.questionId,
+                selected_option_id: selectedOption.value,
+                response_time: 0 // You can add timing logic here if needed
+            };
+        }
+    }
+
+    function loadResponse() {
+        const question = questions[currentQuestion];
+        const savedResponse = responses[currentQuestion];
+        
+        if (savedResponse) {
+            const option = question.querySelector(`input[value="${savedResponse.selected_option_id}"]`);
+            if (option) {
+                option.checked = true;
+                option.closest('.option').classList.add('selected');
+            }
+        }
+    }
+
+    prevBtn.addEventListener('click', () => {
+        saveResponse();
+        currentQuestion--;
+        showQuestion(currentQuestion);
+        loadResponse();
+    });
+
+    nextBtn.addEventListener('click', () => {
+        saveResponse();
+        currentQuestion++;
+        showQuestion(currentQuestion);
+        loadResponse();
+    });
+
+    submitBtn.addEventListener('click', async () => {
+        saveResponse();
+        
+        try {
+            const response = await fetch(`/dyslexia/assignments/{{ assignment.id }}/submit/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ responses: responses })
+            });
+
+            const data = await response.json();
+            if (data.status === 'success') {
+                window.location.href = data.redirect_url;
+            }
+        } catch (error) {
+            console.error('Error submitting assignment:', error);
+            alert('There was an error submitting your assignment. Please try again.');
+        }
+    });
+
+    // Handle option selection
+    questions.forEach(question => {
+        question.querySelectorAll('.option').forEach(option => {
+            option.addEventListener('click', () => {
+                const radio = option.querySelector('input[type="radio"]');
+                radio.checked = true;
+                option.classList.add('selected');
+                
+                // Remove selected class from other options
+                question.querySelectorAll('.option').forEach(opt => {
+                    if (opt !== option) {
+                        opt.classList.remove('selected');
+                    }
+                });
+            });
+        });
+    });
+</script>
+{% endblock %} 

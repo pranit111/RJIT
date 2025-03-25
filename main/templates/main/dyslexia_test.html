@@ -1,0 +1,374 @@
+{% extends 'main/base.html' %}
+
+{% block content %}
+<div class="test-container">
+    <h2>Dyslexia Screening Test</h2>
+    <p class="test-intro">This test will help identify your specific type and level of dyslexia. Please answer each question carefully.</p>
+    
+    <form id="dyslexiaTestForm" class="test-form">
+        {% csrf_token %}
+        
+        <!-- Phonological Section -->
+        <section class="test-section" id="phonological">
+            <h3>1. Phonological Dyslexia Test</h3>
+            <p class="section-description">This section tests your ability to process sounds and phonemes.</p>
+            
+            {% for question in phonological_questions %}
+            <div class="question-container" data-question-id="{{ question.id }}">
+                {% if question.question_type == 'text_to_speech' %}
+                    <div class="question-text {% if question.hide_question_text %}hidden{% endif %}">
+                        {{ question.question_text }}
+                    </div>
+                    <button type="button" class="speak-button" data-text="{{ question.question_text }}">
+                        <i class="fas fa-volume-up"></i> Listen to Question
+                    </button>
+                {% endif %}
+                
+                {% if question.image_file %}
+                <div class="image-container">
+                    <img src="{{ question.image_file.url }}" alt="Question Image">
+                </div>
+                {% endif %}
+                
+                <div class="options">
+                    {% for option in question.options %}
+                    <label class="option">
+                        <input type="radio" name="q{{ question.id }}" value="{{ option }}">
+                        <span class="option-text">{{ option }}</span>
+                        <button type="button" class="speak-option" data-text="{{ option }}">
+                            <i class="fas fa-volume-up"></i>
+                        </button>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+        
+        <!-- Surface Section -->
+        <section class="test-section" id="surface">
+            <h3>2. Surface Dyslexia Test</h3>
+            <p class="section-description">This section tests your ability to recognize whole words and irregular spellings.</p>
+            
+            {% for question in surface_questions %}
+            <div class="question-container" data-question-id="{{ question.id }}">
+                {% if question.question_type == 'text_to_speech' %}
+                    <div class="question-text {% if question.hide_question_text %}hidden{% endif %}">
+                        {{ question.question_text }}
+                    </div>
+                    <button type="button" class="speak-button" data-text="{{ question.question_text }}">
+                        <i class="fas fa-volume-up"></i> Listen to Question
+                    </button>
+                {% endif %}
+                
+                {% if question.image_file %}
+                <div class="image-container">
+                    <img src="{{ question.image_file.url }}" alt="Question Image">
+                </div>
+                {% endif %}
+                
+                <div class="options">
+                    {% for option in question.options %}
+                    <label class="option">
+                        <input type="radio" name="q{{ question.id }}" value="{{ option }}">
+                        <span class="option-text">{{ option }}</span>
+                        <button type="button" class="speak-option" data-text="{{ option }}">
+                            <i class="fas fa-volume-up"></i>
+                        </button>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+        
+        <!-- Visual Section -->
+        <section class="test-section" id="visual">
+            <h3>3. Visual Dyslexia Test</h3>
+            <p class="section-description">This section tests your ability to recognize letters and words visually.</p>
+            
+            {% for question in visual_questions %}
+            <div class="question-container" data-question-id="{{ question.id }}">
+                {% if question.question_type == 'text_to_speech' %}
+                    <div class="question-text {% if question.hide_question_text %}hidden{% endif %}">
+                        {{ question.question_text }}
+                    </div>
+                    <button type="button" class="speak-button" data-text="{{ question.question_text }}">
+                        <i class="fas fa-volume-up"></i> Listen to Question
+                    </button>
+                {% endif %}
+                
+                {% if question.image_file %}
+                <div class="image-container">
+                    <img src="{{ question.image_file.url }}" alt="Question Image">
+                </div>
+                {% endif %}
+                
+                <div class="options">
+                    {% for option in question.options %}
+                    <label class="option">
+                        <input type="radio" name="q{{ question.id }}" value="{{ option }}">
+                        <span class="option-text">{{ option }}</span>
+                        <button type="button" class="speak-option" data-text="{{ option }}">
+                            <i class="fas fa-volume-up"></i>
+                        </button>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+        
+        <button type="submit" class="submit-btn">Submit Test</button>
+    </form>
+</div>
+
+<style>
+    .test-container {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 20px;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    .test-intro {
+        text-align: center;
+        margin-bottom: 30px;
+        color: #666;
+    }
+
+    .test-section {
+        margin-bottom: 40px;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .section-description {
+        color: #666;
+        margin-bottom: 20px;
+    }
+
+    .question-container {
+        margin-bottom: 30px;
+        padding: 15px;
+        background-color: #f9f9f9;
+        border-radius: 4px;
+    }
+
+    .question-text {
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+
+    .audio-player {
+        margin: 15px 0;
+    }
+
+    .image-container {
+        width: 200px;
+        margin: 15px 0;
+        text-align: center;
+    }
+
+    .image-container img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 4px;
+    }
+
+    .options {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .option {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .option:hover {
+        background-color: #f0f0f0;
+    }
+
+    .submit-btn {
+        display: block;
+        width: 100%;
+        padding: 15px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 16px;
+        cursor: pointer;
+        margin-top: 20px;
+    }
+
+    .submit-btn:hover {
+        background-color: #0056b3;
+    }
+
+    .question-text.hidden {
+        display: none;
+    }
+
+    .speak-button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 10px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .speak-option {
+        background: none;
+        border: none;
+        color: #007bff;
+        cursor: pointer;
+        padding: 5px;
+    }
+
+    .question-container.correct {
+        border-left: 4px solid #28a745;
+    }
+    
+    .question-container.incorrect {
+        border-left: 4px solid #dc3545;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('dyslexiaTestForm');
+    const questions = document.querySelectorAll('.question-container');
+    let startTime = Date.now();
+    
+    // Initialize speech synthesis
+    const synth = window.speechSynthesis;
+    
+    // Function to speak text
+    function speakText(text) {
+        synth.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        synth.speak(utterance);
+    }
+    
+    // Add click handlers for speak buttons
+    document.querySelectorAll('.speak-button, .speak-option').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const textToSpeak = this.dataset.text;
+            speakText(textToSpeak);
+        });
+    });
+    
+    // Get CSRF token
+    function getCSRFToken() {
+        const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+        return csrfInput ? csrfInput.value : '';
+    }
+    
+    // Track response times and submit responses
+    questions.forEach(question => {
+        const inputs = question.querySelectorAll('input[type="radio"]');
+        inputs.forEach(input => {
+            input.addEventListener('change', async function() {
+                const questionId = question.dataset.questionId;
+                const selectedAnswer = this.value;
+                const responseTime = Math.floor((Date.now() - startTime) / 1000);
+                
+                try {
+                    const response = await fetch('/submit-test-response/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCSRFToken()
+                        },
+                        body: JSON.stringify({
+                            question_id: questionId,
+                            answer: selectedAnswer,
+                            response_time: responseTime
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        // Only show correct answer feedback
+                        question.classList.remove('correct');
+                        if (data.is_correct) {
+                            question.classList.add('correct');
+                        }
+                    } else {
+                        console.error('Error:', data.error);
+                        alert('Failed to submit answer. Please try again.');
+                    }
+                } catch (error) {
+                    console.error('Error submitting response:', error);
+                    alert('Failed to submit answer. Please try again.');
+                }
+            });
+        });
+    });
+    
+    // Submit final results
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Calculate scores based on correct answers only
+        const scores = {
+            phonological: 0,
+            surface: 0,
+            visual: 0,
+            total: 0
+        };
+        
+        // Get all correct answers
+        const correctAnswers = document.querySelectorAll('.question-container.correct');
+        correctAnswers.forEach(question => {
+            const section = question.closest('.test-section').id;
+            scores[section]++;
+            scores.total++;
+        });
+        
+        try {
+            const response = await fetch('/submit-test-results/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify(scores)
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                // Show success message and redirect
+                alert(`Test completed successfully!\n\nYour Results:\nDyslexia Type: ${data.dyslexia_type}\nLevel: ${data.dyslexia_level}\nCondition Level: ${data.condition_level || 'None'}\nTotal Score: ${data.total_percentage}%`);
+                window.location.href = '/dyslexia/dashboard/';
+            } else {
+                console.error('Error:', data.error);
+                alert('Failed to submit test results. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error submitting results:', error);
+            alert('Failed to submit test results. Please try again.');
+        }
+    });
+});
+</script>
+{% endblock %} 
