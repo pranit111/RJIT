@@ -13,48 +13,52 @@
             <div class="progress" id="progressBar"></div>
         </div>
 
-        <div class="question-container">
-            {% for question in questions %}
-            <div class="question-card" data-question-id="{{ question.id }}" style="display: {% if forloop.first %}block{% else %}none{% endif %}">
-                <div class="question-header">
-                    <span class="question-number">Question {{ forloop.counter }} of {{ questions|length }}</span>
-                </div>
-
-                <div class="question-content">
-                    {% if question.question_type == 'image' and question.image %}
-                    <div class="question-image">
-                        <img src="{{ question.image.url }}" alt="Question Image">
-                    </div>
-                    {% endif %}
-
-                    <div class="question-text">
-                        {{ question.text }}
+        <form id="assignmentForm" method="POST" action="{% url 'dyslexia:submit_assignment' assignment.id %}">
+            {% csrf_token %}
+            <div class="question-container">
+                {% for question in questions %}
+                <div class="question-card" data-question-id="{{ question.id }}" style="display: {% if forloop.first %}block{% else %}none{% endif %}">
+                    <div class="question-header">
+                        <span class="question-number">Question {{ forloop.counter }} of {{ questions|length }}</span>
                     </div>
 
-                    <div class="options-container">
-                        {% for option in question.options.all %}
-                        <div class="option">
-                            <input type="radio" 
-                                   name="question_{{ question.id }}" 
-                                   value="{{ option.id }}" 
-                                   id="option_{{ option.id }}"
-                                   class="option-input">
-                            <label for="option_{{ option.id }}" class="option-label">
-                                {{ option.text }}
-                            </label>
+                    <div class="question-content">
+                        {% if question.question_type == 'image' and question.image %}
+                        <div class="question-image">
+                            <img src="{{ question.image.url }}" alt="Question Image">
                         </div>
-                        {% endfor %}
+                        {% endif %}
+
+                        <div class="question-text">
+                            {{ question.text }}
+                        </div>
+
+                        <div class="options-container">
+                            {% for option in question.options.all %}
+                            <div class="option">
+                                <input type="radio" 
+                                       name="question_{{ question.id }}" 
+                                       value="{{ option.id }}" 
+                                       id="option_{{ option.id }}"
+                                       class="option-input"
+                                       required>
+                                <label for="option_{{ option.id }}" class="option-label">
+                                    {{ option.text }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
-        </div>
 
-        <div class="navigation-buttons">
-            <button id="prevBtn" class="nav-btn" style="display: none;">Previous</button>
-            <button id="nextBtn" class="nav-btn">Next</button>
-            <button id="submitBtn" class="nav-btn submit-btn" style="display: none;">Submit Assignment</button>
-        </div>
+            <div class="navigation-buttons">
+                <button type="button" id="prevBtn" class="nav-btn" style="display: none;">Previous</button>
+                <button type="button" id="nextBtn" class="nav-btn">Next</button>
+                <button type="submit" id="submitBtn" class="nav-btn submit-btn" style="display: none;">Submit Assignment</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -180,16 +184,30 @@
         border-radius: 5px;
         font-size: 1rem;
         cursor: pointer;
-        transition: background-color 0.2s;
+        transition: all 0.2s ease;
+        z-index: 1000;
+        position: relative;
+        min-width: 120px;
     }
 
     .nav-btn:not(.submit-btn) {
-        background-color: #f5f5f5;
-        color: #333;
+        background-color: #2196f3;
+        color: white;
     }
 
     .nav-btn:not(.submit-btn):hover {
-        background-color: #e0e0e0;
+        background-color: #1976d2;
+        transform: translateY(-1px);
+    }
+
+    .nav-btn:not(.submit-btn):active {
+        transform: translateY(0);
+    }
+
+    .nav-btn:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+        transform: none;
     }
 
     .submit-btn {
@@ -203,110 +221,186 @@
 </style>
 
 <script>
-    let currentQuestion = 0;
-    const questions = document.querySelectorAll('.question-card');
-    const progressBar = document.getElementById('progressBar');
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-    const submitBtn = document.getElementById('submitBtn');
-    let responses = [];
+    // Wait for the DOM to be fully loaded
+    window.addEventListener('load', function() {
+        const assignmentId = {{ assignment.id }};
+        let currentQuestion = 0;
+        const questions = document.querySelectorAll('.question-card');
+        const progressBar = document.getElementById('progressBar');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const submitBtn = document.getElementById('submitBtn');
+        const form = document.getElementById('assignmentForm');
+        let responses = [];
 
-    function updateProgress() {
-        const progress = ((currentQuestion + 1) / questions.length) * 100;
-        progressBar.style.width = `${progress}%`;
-    }
+        // Debug logging
+        console.log('Assignment ID:', assignmentId);
+        console.log('Questions found:', questions.length);
+        console.log('Next button element:', nextBtn);
 
-    function showQuestion(index) {
-        questions.forEach((q, i) => {
-            q.style.display = i === index ? 'block' : 'none';
-        });
-
-        prevBtn.style.display = index === 0 ? 'none' : 'block';
-        nextBtn.style.display = index === questions.length - 1 ? 'none' : 'block';
-        submitBtn.style.display = index === questions.length - 1 ? 'block' : 'none';
-
-        updateProgress();
-    }
-
-    function saveResponse() {
-        const question = questions[currentQuestion];
-        const selectedOption = question.querySelector('input[type="radio"]:checked');
-        
-        if (selectedOption) {
-            responses[currentQuestion] = {
-                question_id: question.dataset.questionId,
-                selected_option_id: selectedOption.value,
-                response_time: 0 // You can add timing logic here if needed
-            };
+        function updateProgress() {
+            const progress = ((currentQuestion + 1) / questions.length) * 100;
+            progressBar.style.width = `${progress}%`;
+            console.log('Progress updated:', progress + '%');
         }
-    }
 
-    function loadResponse() {
-        const question = questions[currentQuestion];
-        const savedResponse = responses[currentQuestion];
-        
-        if (savedResponse) {
-            const option = question.querySelector(`input[value="${savedResponse.selected_option_id}"]`);
-            if (option) {
-                option.checked = true;
-                option.closest('.option').classList.add('selected');
+        function showQuestion(index) {
+            console.log('Showing question:', index);
+            
+            // Validate index
+            if (index < 0 || index >= questions.length) {
+                console.error('Invalid question index:', index);
+                return;
+            }
+
+            // Hide all questions
+            questions.forEach(q => q.style.display = 'none');
+            
+            // Show the current question
+            questions[index].style.display = 'block';
+
+            // Update navigation buttons
+            prevBtn.style.display = index === 0 ? 'none' : 'block';
+            nextBtn.style.display = index === questions.length - 1 ? 'none' : 'block';
+            submitBtn.style.display = index === questions.length - 1 ? 'block' : 'none';
+
+            // Ensure buttons are enabled
+            prevBtn.disabled = false;
+            nextBtn.disabled = false;
+            submitBtn.disabled = false;
+
+            updateProgress();
+        }
+
+        function saveResponse() {
+            const question = questions[currentQuestion];
+            const selectedOption = question.querySelector('input[type="radio"]:checked');
+            
+            if (selectedOption) {
+                responses[currentQuestion] = {
+                    question_id: question.dataset.questionId,
+                    selected_option_id: selectedOption.value,
+                    response_time: 0
+                };
+                console.log('Saved response for question', currentQuestion + 1, ':', responses[currentQuestion]);
+            } else {
+                console.log('No response selected for question', currentQuestion + 1);
             }
         }
-    }
 
-    prevBtn.addEventListener('click', () => {
-        saveResponse();
-        currentQuestion--;
-        showQuestion(currentQuestion);
-        loadResponse();
-    });
+        function loadResponse() {
+            const question = questions[currentQuestion];
+            const savedResponse = responses[currentQuestion];
+            
+            if (savedResponse) {
+                const option = question.querySelector(`input[value="${savedResponse.selected_option_id}"]`);
+                if (option) {
+                    option.checked = true;
+                    option.closest('.option').classList.add('selected');
+                    console.log('Loaded response for question', currentQuestion + 1);
+                }
+            }
+        }
 
-    nextBtn.addEventListener('click', () => {
-        saveResponse();
-        currentQuestion++;
-        showQuestion(currentQuestion);
-        loadResponse();
-    });
-
-    submitBtn.addEventListener('click', async () => {
-        saveResponse();
-        
-        try {
-            const response = await fetch(`/dyslexia/assignments/{{ assignment.id }}/submit/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify({ responses: responses })
+        // Add event listeners for navigation buttons
+        if (prevBtn) {
+            prevBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Previous button clicked');
+                saveResponse();
+                currentQuestion--;
+                showQuestion(currentQuestion);
+                loadResponse();
             });
-
-            const data = await response.json();
-            if (data.status === 'success') {
-                window.location.href = data.redirect_url;
-            }
-        } catch (error) {
-            console.error('Error submitting assignment:', error);
-            alert('There was an error submitting your assignment. Please try again.');
         }
-    });
 
-    // Handle option selection
-    questions.forEach(question => {
-        question.querySelectorAll('.option').forEach(option => {
-            option.addEventListener('click', () => {
-                const radio = option.querySelector('input[type="radio"]');
-                radio.checked = true;
-                option.classList.add('selected');
-                
-                // Remove selected class from other options
-                question.querySelectorAll('.option').forEach(opt => {
-                    if (opt !== option) {
-                        opt.classList.remove('selected');
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('Next button clicked');
+                saveResponse();
+                currentQuestion++;
+                showQuestion(currentQuestion);
+                loadResponse();
+            });
+        }
+
+        // Add event listeners for option selection
+        questions.forEach(question => {
+            question.querySelectorAll('.option').forEach(option => {
+                option.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const radio = option.querySelector('input[type="radio"]');
+                    if (radio) {
+                        radio.checked = true;
+                        option.classList.add('selected');
+                        // Remove selected class from other options
+                        question.querySelectorAll('.option').forEach(opt => {
+                            if (opt !== option) {
+                                opt.classList.remove('selected');
+                            }
+                        });
+                        console.log('Option selected:', radio.value);
                     }
                 });
             });
         });
+
+        // Handle form submission
+        if (form) {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                console.log('Form submitted');
+                
+                // Validate that all questions are answered
+                const unansweredQuestions = Array.from(questions).filter(question => {
+                    return !question.querySelector('input[type="radio"]:checked');
+                });
+
+                if (unansweredQuestions.length > 0) {
+                    alert('Please answer all questions before submitting.');
+                    return;
+                }
+
+                // Collect all responses
+                const formResponses = Array.from(questions).map(question => {
+                    const selectedOption = question.querySelector('input[type="radio"]:checked');
+                    return {
+                        question_id: question.dataset.questionId,
+                        selected_option_id: selectedOption.value,
+                        response_time: 0
+                    };
+                });
+
+                try {
+                    const response = await fetch(`/dyslexia/assignments/${assignmentId}/submit/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify({
+                            responses: formResponses
+                        })
+                    });
+
+                    const data = await response.json();
+                    console.log('Submission response:', data);
+                    
+                    if (data.status === 'success') {
+                        window.location.href = data.redirect_url;
+                    } else {
+                        alert('Error submitting assignment. Please try again.');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Error submitting assignment. Please try again.');
+                }
+            });
+        }
+
+        // Initialize the first question
+        showQuestion(0);
     });
 </script>
 {% endblock %} 

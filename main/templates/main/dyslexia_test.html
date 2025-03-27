@@ -1,8 +1,11 @@
-{% extends 'main/base.html' %}
-
 {% block content %}
 <div class="test-container">
-    <h2>Dyslexia Screening Test</h2>
+    <div class="test-header">
+        <h2>Dyslexia Screening Test</h2>
+        <a href="{% url 'main:logout' %}" class="logout-btn">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+    </div>
     <p class="test-intro">This test will help identify your specific type and level of dyslexia. Please answer each question carefully.</p>
     
     <form id="dyslexiaTestForm" class="test-form">
@@ -15,10 +18,10 @@
             
             {% for question in phonological_questions %}
             <div class="question-container" data-question-id="{{ question.id }}">
+                <div class="question-text {% if question.hide_question_text %}hidden{% endif %}">
+                    {{ question.question_text }}
+                </div>
                 {% if question.question_type == 'text_to_speech' %}
-                    <div class="question-text {% if question.hide_question_text %}hidden{% endif %}">
-                        {{ question.question_text }}
-                    </div>
                     <button type="button" class="speak-button" data-text="{{ question.question_text }}">
                         <i class="fas fa-volume-up"></i> Listen to Question
                     </button>
@@ -52,10 +55,10 @@
             
             {% for question in surface_questions %}
             <div class="question-container" data-question-id="{{ question.id }}">
+                <div class="question-text {% if question.hide_question_text %}hidden{% endif %}">
+                    {{ question.question_text }}
+                </div>
                 {% if question.question_type == 'text_to_speech' %}
-                    <div class="question-text {% if question.hide_question_text %}hidden{% endif %}">
-                        {{ question.question_text }}
-                    </div>
                     <button type="button" class="speak-button" data-text="{{ question.question_text }}">
                         <i class="fas fa-volume-up"></i> Listen to Question
                     </button>
@@ -89,10 +92,10 @@
             
             {% for question in visual_questions %}
             <div class="question-container" data-question-id="{{ question.id }}">
+                <div class="question-text {% if question.hide_question_text %}hidden{% endif %}">
+                    {{ question.question_text }}
+                </div>
                 {% if question.question_type == 'text_to_speech' %}
-                    <div class="question-text {% if question.hide_question_text %}hidden{% endif %}">
-                        {{ question.question_text }}
-                    </div>
                     <button type="button" class="speak-button" data-text="{{ question.question_text }}">
                         <i class="fas fa-volume-up"></i> Listen to Question
                     </button>
@@ -124,6 +127,12 @@
 </div>
 
 <style>
+      body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+        }
     .test-container {
         max-width: 800px;
         margin: 40px auto;
@@ -131,6 +140,39 @@
         background-color: white;
         border-radius: 8px;
         box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    .test-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .test-header h2 {
+        margin: 0;
+        color: #2c3e50;
+    }
+
+    .logout-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background-color: #dc3545;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        font-size: 14px;
+        transition: background-color 0.3s;
+    }
+
+    .logout-btn:hover {
+        background-color: #c82333;
+    }
+
+    .logout-btn i {
+        font-size: 16px;
     }
 
     .test-intro {
@@ -161,6 +203,13 @@
     .question-text {
         font-weight: bold;
         margin-bottom: 15px;
+        font-size: 16px;
+        line-height: 1.6;
+        color: #2c3e50;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        border-left: 4px solid #007bff;
     }
 
     .audio-player {
@@ -171,6 +220,10 @@
         width: 200px;
         margin: 15px 0;
         text-align: center;
+        padding: 10px;
+        background-color: white;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
     .image-container img {
@@ -240,14 +293,6 @@
         cursor: pointer;
         padding: 5px;
     }
-
-    .question-container.correct {
-        border-left: 4px solid #28a745;
-    }
-    
-    .question-container.incorrect {
-        border-left: 4px solid #dc3545;
-    }
 </style>
 
 <script>
@@ -255,6 +300,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('dyslexiaTestForm');
     const questions = document.querySelectorAll('.question-container');
     let startTime = Date.now();
+    let correctAnswers = new Set(); // Track correct answers
     
     // Initialize speech synthesis
     const synth = window.speechSynthesis;
@@ -308,10 +354,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     const data = await response.json();
                     if (data.success) {
-                        // Only show correct answer feedback
-                        question.classList.remove('correct');
+                        // Track correct answers
                         if (data.is_correct) {
-                            question.classList.add('correct');
+                            correctAnswers.add(questionId);
+                        } else {
+                            correctAnswers.delete(questionId);
                         }
                     } else {
                         console.error('Error:', data.error);
@@ -329,7 +376,7 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
         
-        // Calculate scores based on correct answers only
+        // Calculate scores based on correct answers
         const scores = {
             phonological: 0,
             surface: 0,
@@ -337,12 +384,14 @@ document.addEventListener('DOMContentLoaded', function() {
             total: 0
         };
         
-        // Get all correct answers
-        const correctAnswers = document.querySelectorAll('.question-container.correct');
-        correctAnswers.forEach(question => {
-            const section = question.closest('.test-section').id;
-            scores[section]++;
-            scores.total++;
+        // Count correct answers by section
+        correctAnswers.forEach(questionId => {
+            const question = document.querySelector(`[data-question-id="${questionId}"]`);
+            if (question) {
+                const section = question.closest('.test-section').id;
+                scores[section]++;
+                scores.total++;
+            }
         });
         
         try {
@@ -359,7 +408,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) {
                 // Show success message and redirect
                 alert(`Test completed successfully!\n\nYour Results:\nDyslexia Type: ${data.dyslexia_type}\nLevel: ${data.dyslexia_level}\nCondition Level: ${data.condition_level || 'None'}\nTotal Score: ${data.total_percentage}%`);
-                window.location.href = '/dyslexia/dashboard/';
+                window.location.href = '/dyslexia/';
             } else {
                 console.error('Error:', data.error);
                 alert('Failed to submit test results. Please try again.');

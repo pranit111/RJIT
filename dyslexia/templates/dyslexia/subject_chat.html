@@ -8,17 +8,36 @@
         <p class="subject-info">Ask questions about {{ subject }} and get dyslexia-friendly explanations</p>
     </div>
 
-    <div class="chat-container">
-        <div id="chatbox" class="chat-messages"></div>
-        
-        <div class="chat-input-container">
-            <div class="input-wrapper">
-                <input type="text" id="userInput" placeholder="Type your question here..." />
-                <button class="voice-btn" onclick="startVoiceInput()" id="voiceBtn">
-                    <span id="micIcon">🎤</span>
-                </button>
+    <div class="chat-layout">
+        <!-- Extracted Text Section -->
+        <div class="extracted-text-section">
+            <div class="section-header">
+                <h2>Extracted Text</h2>
+                <div class="text-controls">
+                    <button id="toggleReadAloud" class="control-btn">
+                        <i class="fas fa-volume-up"></i> Read Aloud
+                    </button>
+                  
+                </div>
             </div>
-            <button class="send-btn" onclick="sendMessage()">Send</button>
+            <div id="extractedText" class="extracted-text-content"></div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="chat-section">
+            <div class="chat-container">
+                <div id="chatbox" class="chat-messages"></div>
+                
+                <div class="chat-input-container">
+                    <div class="input-wrapper">
+                        <input type="text" id="userInput" placeholder="Type your question here..." />
+                        <button class="voice-btn" onclick="startVoiceInput()" id="voiceBtn">
+                            <span id="micIcon">🎤</span>
+                        </button>
+                    </div>
+                    <button class="send-btn" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -73,6 +92,115 @@
         font-size: 1.1em;
     }
 
+    .chat-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .extracted-text-section {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 20px;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .section-header h2 {
+        color: #2c3e50;
+        margin: 0;
+    }
+
+    .text-controls {
+        display: flex;
+        gap: 10px;
+    }
+
+    .control-btn {
+        padding: 8px 15px;
+        border: none;
+        border-radius: 5px;
+        background: #2196f3;
+        color: white;
+        cursor: pointer;
+        font-family: 'OpenDyslexic', Arial, sans-serif;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .control-btn:hover {
+        background: #1976d2;
+    }
+
+    .extracted-text-content {
+        height: 500px;
+        overflow-y: auto;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 5px;
+        font-size: 16px;
+        line-height: 1.6;
+        font-family: 'OpenDyslexic', Arial, sans-serif;
+    }
+
+    /* Dyslexia-friendly styles */
+    .dyslexic-mode {
+        font-size: 18px;
+        line-height: 1.8;
+        letter-spacing: 1px;
+        font-family: 'OpenDyslexic', Arial, sans-serif;
+    }
+
+    .confusing-pair {
+        position: relative;
+        display: inline-block;
+        font-weight: bold;
+    }
+
+    .confusing-pair[data-pair="b/d"] {
+        color: #e91e63;
+        background-color: #fce4ec;
+        padding: 0 2px;
+        border-radius: 3px;
+    }
+
+    .confusing-pair[data-pair="p/q"] {
+        color: #2196f3;
+        background-color: #e3f2fd;
+        padding: 0 2px;
+        border-radius: 3px;
+    }
+
+    .confusing-pair[data-pair="o/O"] {
+        color: #4caf50;
+        background-color: #e8f5e9;
+        padding: 0 2px;
+        border-radius: 3px;
+    }
+
+    .confusing-pair::after {
+        content: attr(data-pair);
+        position: absolute;
+        bottom: -20px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 10px;
+        color: #666;
+        white-space: nowrap;
+        background: white;
+        padding: 0 3px;
+        border-radius: 3px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
     .chat-container {
         background: white;
         border-radius: 10px;
@@ -93,18 +221,25 @@
         border-radius: 10px;
         max-width: 80%;
         word-wrap: break-word;
+        font-family: 'OpenDyslexic', Arial, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+        position: relative;
+        padding-right: 40px; /* Make space for the speak button */
     }
 
     .user-message {
         background: #e3f2fd;
         margin-left: auto;
         color: #1565c0;
+        font-weight: 500;
     }
 
     .tutor-message {
         background: #f5f5f5;
         margin-right: auto;
         color: #2c3e50;
+        font-weight: 500;
     }
 
     .chat-input-container {
@@ -128,6 +263,7 @@
         border-radius: 5px;
         font-size: 16px;
         font-family: 'OpenDyslexic', Arial, sans-serif;
+        line-height: 1.6;
     }
 
     .voice-btn, .send-btn {
@@ -138,6 +274,7 @@
         font-size: 16px;
         font-family: 'OpenDyslexic', Arial, sans-serif;
         transition: background-color 0.3s;
+        font-weight: 500;
     }
 
     .voice-btn {
@@ -216,10 +353,6 @@
         color: #666;
     }
 
-    .message {
-        position: relative;
-    }
-
     .speak-btn {
         position: absolute;
         right: 10px;
@@ -232,14 +365,60 @@
         padding: 5px;
         opacity: 0;
         transition: opacity 0.3s;
+        font-family: 'OpenDyslexic', Arial, sans-serif;
+        font-size: 16px;
     }
 
     .message:hover .speak-btn {
         opacity: 1;
     }
+
+    .loading-text, .error-text {
+        font-family: 'OpenDyslexic', Arial, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+    }
+
+    .retry-btn {
+        margin-top: 10px;
+        padding: 8px 16px;
+        background: #2196f3;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-family: 'OpenDyslexic', Arial, sans-serif;
+        font-size: 16px;
+        font-weight: 500;
+    }
+
+    .retry-btn:hover {
+        background: #1976d2;
+    }
+
+    input:disabled, button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
 </style>
 
 <script>
+    // Add getCookie function at the beginning of the script section
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
     let isRecording = false;
     let recognition = null;
     let userInput = document.getElementById('userInput');
@@ -248,6 +427,143 @@
     let voices = [];
     let selectedVoice = null;
     let speechSynthesis = window.speechSynthesis;
+
+    // Add new variables for text processing
+    let isDyslexicMode = false;
+    let currentText = '';
+    let readAloudEnabled = false;
+    let currentUtterance = null;
+    let isLoadingText = true;
+
+    // Initialize the chat interface
+    document.addEventListener('DOMContentLoaded', function() {
+        loadVoices();
+        setupEventListeners();
+        fetchExtractedText();
+    });
+
+    function setupEventListeners() {
+        // Check if elements exist before adding event listeners
+        const toggleDyslexicModeBtn = document.getElementById('toggleDyslexicMode');
+        const toggleReadAloudBtn = document.getElementById('toggleReadAloud');
+        
+        if (toggleDyslexicModeBtn) {
+            toggleDyslexicModeBtn.addEventListener('click', toggleDyslexicMode);
+        }
+        
+        if (toggleReadAloudBtn) {
+            toggleReadAloudBtn.addEventListener('click', toggleReadAloud);
+        }
+        
+        // Disable input until text is loaded
+        if (userInput) userInput.disabled = true;
+        if (voiceBtn) voiceBtn.disabled = true;
+        const sendBtn = document.querySelector('.send-btn');
+        if (sendBtn) sendBtn.disabled = true;
+    }
+
+    async function fetchExtractedText() {
+        const container = document.getElementById('extractedText');
+        if (!container) {
+            console.error('Extracted text container not found');
+            return;
+        }
+
+        container.innerHTML = '<div class="loading-text">Loading content...</div>';
+        
+        try {
+            const response = await fetch(`{% url 'dyslexia:get_extracted_text' subject=subject %}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            if (!data.text) {
+                throw new Error('No text content received');
+            }
+            
+            currentText = data.text;
+            updateExtractedText();
+            
+            // Enable input after text is loaded
+            if (userInput) userInput.disabled = false;
+            if (voiceBtn) voiceBtn.disabled = false;
+            const sendBtn = document.querySelector('.send-btn');
+            if (sendBtn) sendBtn.disabled = false;
+            isLoadingText = false;
+            
+        } catch (error) {
+            console.error('Error fetching extracted text:', error);
+            container.innerHTML = `
+                <div class="error-text">
+                    Error loading content: ${error.message}
+                    <br>
+                    <button onclick="fetchExtractedText()" class="retry-btn">Retry</button>
+                </div>`;
+        }
+    }
+
+    function updateExtractedText() {
+        const container = document.getElementById('extractedText');
+        if (isDyslexicMode) {
+            // Clear existing content
+            container.innerHTML = '';
+            // Process and add the text
+            container.innerHTML = processDyslexicText(currentText);
+            container.classList.add('dyslexic-mode');
+        } else {
+            // For normal mode, just display the text as is
+            container.textContent = currentText;
+            container.classList.remove('dyslexic-mode');
+        }
+    }
+
+    function toggleDyslexicMode() {
+        isDyslexicMode = !isDyslexicMode;
+        updateExtractedText();
+    }
+
+    function toggleReadAloud() {
+        readAloudEnabled = !readAloudEnabled;
+        const button = document.getElementById('toggleReadAloud');
+        button.classList.toggle('active');
+        
+        if (readAloudEnabled) {
+            startReadAloud();
+        } else {
+            stopReadAloud();
+        }
+    }
+
+    function startReadAloud() {
+        if (currentUtterance) {
+            speechSynthesis.cancel();
+        }
+
+        const text = document.getElementById('extractedText').textContent;
+        currentUtterance = new SpeechSynthesisUtterance(text);
+        
+        // Apply voice settings
+        currentUtterance.voice = selectedVoice;
+        currentUtterance.rate = document.getElementById('rateRange').value;
+        currentUtterance.pitch = document.getElementById('pitchRange').value;
+        currentUtterance.volume = document.getElementById('volumeRange').value;
+
+        speechSynthesis.speak(currentUtterance);
+    }
+
+    function stopReadAloud() {
+        if (currentUtterance) {
+            speechSynthesis.cancel();
+            currentUtterance = null;
+        }
+    }
 
     // Initialize voices
     function loadVoices() {
@@ -378,27 +694,47 @@
         }
     }
 
-    function sendMessage() {
-        let inputField = document.getElementById("userInput");
-        let userMessage = inputField.value.trim();
-        
-        if (!userMessage) return;
-        
-        inputField.value = "";
-        appendMessage(userMessage, 'user');
-        
-        fetch("{% url 'dyslexia:subject_chat_api' subject=subject %}", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": "{{ csrf_token }}"
-            },
-            body: JSON.stringify({ message: userMessage }),
-        })
-        .then(response => response.json())
-        .then(data => {
+    // Modify the sendMessage function to check if text is loaded
+    async function sendMessage() {
+        if (isLoadingText) {
+            appendMessage('Please wait while the content is loading...', 'tutor');
+            return;
+        }
+
+        const message = userInput.value.trim();
+        if (!message) return;
+
+        // Add user message to chat
+        appendMessage(message, 'user');
+        userInput.value = '';
+
+        try {
+            const response = await fetch(`{% url 'dyslexia:subject_chat_api' subject=subject %}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    message: message,
+                    context: currentText
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
             appendMessage(data.response, 'tutor');
-        });
+        } catch (error) {
+            console.error('Error:', error);
+            appendMessage('Sorry, there was an error processing your request.', 'tutor');
+        }
     }
 
     function appendMessage(message, sender) {
@@ -406,7 +742,9 @@
         let messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}-message`;
         
-        let messageContent = document.createElement('span');
+        // Create a container for the message content
+        let messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
         messageContent.textContent = message;
         messageDiv.appendChild(messageContent);
 
@@ -437,9 +775,68 @@
             this.style.animation = 'none';
         }
     });
+
+    // Add retry button styles
+    const style = document.createElement('style');
+    style.textContent = `
+        .retry-btn {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'OpenDyslexic', Arial, sans-serif;
+        }
+        .retry-btn:hover {
+            background: #1976d2;
+        }
+    `;
+    document.head.appendChild(style);
 </script>
 
 <style>
+    @font-face {
+        font-family: 'OpenDyslexic';
+        src: url('{% static "dyslexia/fonts/OpenDyslexic-Regular.woff" %}') format('woff');
+        font-weight: normal;
+        font-style: normal;
+        font-display: swap;
+    }
+
+    .extracted-text-content {
+        height: 500px;
+        overflow-y: auto;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 5px;
+        font-size: 16px;
+        line-height: 1.6;
+        font-family: 'OpenDyslexic', Arial, sans-serif;
+    }
+
+    /* Dyslexia-friendly styles */
+    .dyslexic-mode {
+        font-size: 18px;
+        line-height: 1.8;
+        letter-spacing: 1px;
+        font-family: 'OpenDyslexic', Arial, sans-serif;
+    }
+
+    #userInput {
+        flex: 1;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 16px;
+        font-family: 'OpenDyslexic', Arial, sans-serif;
+    }
+
+    .control-btn, .voice-btn, .send-btn, .settings-btn {
+        font-family: 'OpenDyslexic', Arial, sans-serif;
+    }
+
     @keyframes pulse {
         0% {
             transform: scale(1);

@@ -2,10 +2,10 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.utils import timezone
-from django.db.models import Count, Avg
+from django.db.models import Count, Avg, F
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
-from .models import Quiz, QuizAttempt, QuestionResponse, Option, SubjectMaterial, Assignment, AssignmentSubmission, AssignmentResponse
+from .models import Quiz, QuizAttempt, QuestionResponse, Option, SubjectMaterial, Assignment, AssignmentSubmission, AssignmentResponse, Question
 from main.models import UserProfile, Dyslexia, DyslexiaTestResult
 from django.contrib import messages
 from django.views import View
@@ -20,7 +20,7 @@ subject_ai_instances = {}
 
 def get_subject_ai(subject):
     """Get or create an AI instance for a specific subject."""
-    if subject not in subject_ai_instances:
+    try:
         # Get the subject material
         subject_material = SubjectMaterial.objects.get(subject=subject)
         
@@ -34,15 +34,26 @@ def get_subject_ai(subject):
             raise ValueError(f"PDF file not found at: {pdf_path}")
             
         api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError("GOOGLE_API_KEY environment variable is not set")
+        
+        # Create a unique vector database path for this subject
+        vector_db_path = os.path.join(settings.MEDIA_ROOT, 'vector_dbs', subject.lower())
+        os.makedirs(vector_db_path, exist_ok=True)
         
         # Create new AI instance for this subject
         subject_ai_instances[subject] = DyslexiaTutorAI(
             google_api_key=api_key,
             data_path=pdf_path,
-            persist_directory=f"./vector_db_{subject.lower()}"
+            persist_directory=vector_db_path
         )
-    
-    return subject_ai_instances[subject]
+        
+        return subject_ai_instances[subject]
+        
+    except SubjectMaterial.DoesNotExist:
+        raise ValueError(f"Subject material not found for: {subject}")
+    except Exception as e:
+        raise ValueError(f"Error initializing AI for subject {subject}: {str(e)}")
 
 @login_required
 def quiz_list(request):
@@ -74,6 +85,17 @@ def quiz_detail(request, quiz_id):
     """Display quiz details and questions."""
     quiz = get_object_or_404(Quiz, id=quiz_id)
     
+    # Check if user has a completed attempt
+    completed_attempt = QuizAttempt.objects.filter(
+        user=request.user,
+        quiz=quiz,
+        completed=True
+    ).first()
+    
+    if completed_attempt:
+        messages.info(request, f'You have already completed this quiz with a score of {completed_attempt.score}%. You can view your results or retry the quiz.')
+        return redirect('dyslexia:quiz_result', attempt_id=completed_attempt.id)
+    
     # Check if user has an incomplete attempt
     attempt = QuizAttempt.objects.filter(
         user=request.user,
@@ -82,10 +104,11 @@ def quiz_detail(request, quiz_id):
     ).first()
     
     if not attempt:
-        # Create new attempt
+        # Create new attempt with initial time_taken set to 0
         attempt = QuizAttempt.objects.create(
             user=request.user,
-            quiz=quiz
+            quiz=quiz,
+            time_taken=0  # Initialize time_taken to 0
         )
     
     context = {
@@ -135,58 +158,182 @@ def submit_quiz_response(request, quiz_id):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
 
+def update_dyslexia_level(user):
+    """Update user's dyslexia level based on their progress in quizzes and assignments."""
+    try:
+        user_profile = UserProfile.objects.get(user=user)
+        if user_profile.condition_type != 'dyslexia':
+            return
+
+        # Get all quiz attempts
+        quiz_attempts = QuizAttempt.objects.filter(
+            user=user,
+            completed=True
+        ).order_by('-completed_at')[:5]  # Look at last 5 attempts
+
+        # Get all assignment submissions
+        assignment_submissions = AssignmentSubmission.objects.filter(
+            user=user,
+            completed=True
+        ).order_by('-completed_at')[:5]  # Look at last 5 submissions
+
+        # Calculate average scores
+        quiz_scores = [attempt.score for attempt in quiz_attempts]
+        assignment_scores = [submission.score for submission in assignment_submissions]
+
+        # Calculate overall progress
+        total_attempts = len(quiz_scores) + len(assignment_scores)
+        if total_attempts == 0:
+            return
+
+        avg_score = (sum(quiz_scores) + sum(assignment_scores)) / total_attempts
+
+        # Update dyslexia level based on progress
+        dyslexia_profile = user_profile.dyslexia
+        current_level = dyslexia_profile.level
+
+        if avg_score >= 80:
+            # Significant improvement
+            if current_level == 'high':
+                dyslexia_profile.level = 'medium'
+            elif current_level == 'medium':
+                dyslexia_profile.level = 'low'
+        elif avg_score >= 60:
+            # Moderate improvement
+            if current_level == 'high':
+                dyslexia_profile.level = 'medium'
+        elif avg_score < 40:
+            # Decline in performance
+            if current_level == 'low':
+                dyslexia_profile.level = 'medium'
+            elif current_level == 'medium':
+                dyslexia_profile.level = 'high'
+
+        dyslexia_profile.save()
+
+    except (UserProfile.DoesNotExist, Dyslexia.DoesNotExist):
+        pass
+
 @login_required
 def submit_quiz(request, quiz_id):
     """Handle final quiz submission."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Invalid request method'}, status=400)
     
-    quiz = get_object_or_404(Quiz, id=quiz_id)
-    attempt = get_object_or_404(
-        QuizAttempt,
-        user=request.user,
-        quiz=quiz,
-        completed=False
-    )
-    
-    # Calculate score
-    total_questions = quiz.questions.count()
-    correct_answers = attempt.responses.filter(is_correct=True).count()
-    score = (correct_answers / total_questions) * 100
-    
-    # Update attempt
-    attempt.score = score
-    attempt.completed = True
-    attempt.completed_at = timezone.now()
-    attempt.time_taken = (attempt.completed_at - attempt.started_at).seconds
-    attempt.save()
-    
-    return JsonResponse({
-        'success': True,
-        'score': score,
-        'passed': score >= quiz.pass_mark
-    })
+    try:
+        data = json.loads(request.body)
+        responses_data = data.get('responses', [])
+        
+        quiz = get_object_or_404(Quiz, id=quiz_id)
+        attempt = get_object_or_404(
+            QuizAttempt,
+            user=request.user,
+            quiz=quiz,
+            completed=False
+        )
+        
+        # Save all responses
+        for response_data in responses_data:
+            question_id = response_data.get('question_id')
+            option_id = response_data.get('selected_option_id')
+            
+            if not question_id or not option_id:
+                continue
+                
+            try:
+                question = Question.objects.get(id=question_id)
+                selected_option = Option.objects.get(id=option_id)
+                
+                QuestionResponse.objects.create(
+                    attempt=attempt,
+                    question=question,
+                    selected_option=selected_option,
+                    is_correct=selected_option.is_correct,
+                    response_time=response_data.get('response_time', 0)
+                )
+            except (Question.DoesNotExist, Option.DoesNotExist) as e:
+                print(f"Error saving response: {str(e)}")
+                continue
+        
+        # Calculate score
+        total_questions = quiz.questions.count()
+        correct_answers = attempt.responses.filter(is_correct=True).count()
+        score = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
+        
+        # Update attempt
+        attempt.score = score
+        attempt.completed = True
+        attempt.completed_at = timezone.now()
+        attempt.time_taken = (attempt.completed_at - attempt.started_at).seconds
+        attempt.save()
+        
+        # Update dyslexia level based on progress
+        update_dyslexia_level(request.user)
+        
+        # Generate redirect URL
+        redirect_url = reverse('dyslexia:quiz_result', args=[attempt.id])
+        
+        return JsonResponse({
+            'success': True,
+            'score': score,
+            'passed': score >= quiz.pass_mark,
+            'redirect_url': redirect_url
+        })
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {str(e)}")
+        return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+    except Exception as e:
+        print(f"Unexpected error in submit_quiz: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
 
 @login_required
 def quiz_result(request, attempt_id):
     """Display quiz results and detailed feedback."""
-    attempt = get_object_or_404(
-        QuizAttempt.objects.select_related('quiz'),
-        id=attempt_id,
-        user=request.user,
-        completed=True
-    )
-    
-    responses = attempt.responses.select_related(
-        'question',
-        'selected_option'
-    ).order_by('question__order')
-    
-    context = {
-        'attempt': attempt,
-        'responses': responses
-    }
-    return render(request, 'dyslexia/quiz_result.html', context)
+    try:
+        # Get the attempt with related data
+        attempt = get_object_or_404(
+            QuizAttempt.objects.select_related('quiz', 'user'),
+            id=attempt_id,
+            user=request.user,  # Ensure user can only see their own attempts
+            completed=True
+        )
+        
+        # Get all responses with related data
+        responses = attempt.responses.select_related(
+            'question',
+            'selected_option'
+        ).order_by('question__order')
+        
+        # Calculate statistics
+        total_questions = responses.count()
+        correct_answers = responses.filter(is_correct=True).count()
+        score_percentage = (correct_answers / total_questions * 100) if total_questions > 0 else 0
+        
+        # Get time taken in minutes
+        time_taken_minutes = attempt.time_taken // 60
+        time_taken_seconds = attempt.time_taken % 60
+        
+        context = {
+            'attempt': attempt,
+            'responses': responses,
+            'total_questions': total_questions,
+            'correct_answers': correct_answers,
+            'score_percentage': round(score_percentage, 2),
+            'time_taken_minutes': time_taken_minutes,
+            'time_taken_seconds': time_taken_seconds,
+            'passed': score_percentage >= attempt.quiz.pass_mark,
+            'user': request.user
+        }
+        
+        return render(request, 'dyslexia/quiz_result.html', context)
+        
+    except QuizAttempt.DoesNotExist:
+        messages.error(request, 'Quiz attempt not found or you do not have permission to view it.')
+        return redirect('dyslexia:quiz_list')
+    except Exception as e:
+        messages.error(request, f'Error displaying quiz results: {str(e)}')
+        return redirect('dyslexia:quiz_list')
 
 @login_required
 def dashboard(request):
@@ -219,6 +366,17 @@ def dashboard(request):
         total_score = test_result.total_score
         total_questions_count = sum(total_questions.values())
         overall_percentage = (total_score / total_questions_count * 100) if total_questions_count > 0 else 0
+
+        # Get quiz history
+        quiz_history = QuizAttempt.objects.filter(
+            user=request.user,
+            completed=True
+        ).select_related('quiz').order_by('-completed_at')[:5]  # Last 5 attempts
+
+        # Calculate quiz statistics
+        total_quizzes = QuizAttempt.objects.filter(user=request.user, completed=True).count()
+        passed_quizzes = QuizAttempt.objects.filter(user=request.user, completed=True, score__gte=F('quiz__pass_mark')).count()
+        average_score = QuizAttempt.objects.filter(user=request.user, completed=True).aggregate(Avg('score'))['score__avg'] or 0
         
         context = {
             'user_profile': user_profile,
@@ -227,6 +385,10 @@ def dashboard(request):
             'section_percentages': section_percentages,
             'overall_percentage': round(overall_percentage, 2),
             'total_questions': total_questions,
+            'quiz_history': quiz_history,
+            'total_quizzes': total_quizzes,
+            'passed_quizzes': passed_quizzes,
+            'average_score': round(average_score, 2)
         }
         
         return render(request, 'dyslexia/dashboard.html', context)
@@ -302,26 +464,78 @@ def subject_chat(request, subject):
     }
     return render(request, 'dyslexia/subject_chat.html', context)
 
+@login_required
+def get_extracted_text(request, subject):
+    """Return extracted text from the subject's PDF."""
+    try:
+        # Get the AI instance for this subject
+        ai = get_subject_ai(subject)
+        # Get extracted text
+        extracted_text = ai.get_extracted_text()
+        if not extracted_text:
+            return JsonResponse({
+                'error': 'No text could be extracted from the PDF'
+            }, status=500)
+            
+        return JsonResponse({'text': extracted_text})
+            
+    except ValueError as e:
+        return JsonResponse({
+            'error': str(e)
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'error': f'Unexpected error: {str(e)}'
+        }, status=500)
+
 @csrf_exempt
 @login_required
 def subject_chat_api(request, subject):
     """Handle chat API requests for a specific subject."""
     if request.method == "POST":
-        data = json.loads(request.body)
-        user_query = data.get("message", "")
-
-        if not user_query:
-            return JsonResponse({"error": "No message provided"}, status=400)
-
         try:
-            # Get the AI instance for this subject
-            ai = get_subject_ai(subject)
-            response = ai.process_query(user_query)
-            return JsonResponse({"response": response})
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
+            print(f"Received chat request for subject: {subject}")  # Debug log
+            data = json.loads(request.body)
+            user_query = data.get("message", "")
+            context = data.get("context", "")
 
-    return JsonResponse({"error": "Invalid request"}, status=400)
+            print(f"User query: {user_query}")  # Debug log
+
+            if not user_query:
+                return JsonResponse({"error": "No message provided"}, status=400)
+
+            # Get the AI instance for this subject
+            try:
+                ai = get_subject_ai(subject)
+                print("AI instance created successfully")  # Debug log
+            except Exception as e:
+                print(f"Error creating AI instance: {str(e)}")  # Debug log
+                return JsonResponse({"error": f"Error initializing AI: {str(e)}"}, status=500)
+            
+            # Process the query
+            try:
+                response = ai.process_query(user_query, context=context)
+                print(f"Generated response: {response[:100]}...")  # Debug log (first 100 chars)
+            except Exception as e:
+                print(f"Error processing query: {str(e)}")  # Debug log
+                return JsonResponse({"error": f"Error processing query: {str(e)}"}, status=500)
+            
+            if not response:
+                return JsonResponse({"error": "No response generated"}, status=500)
+                
+            return JsonResponse({"response": response})
+            
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {str(e)}")  # Debug log
+            return JsonResponse({"error": "Invalid JSON data"}, status=400)
+        except ValueError as e:
+            print(f"Value error: {str(e)}")  # Debug log
+            return JsonResponse({"error": str(e)}, status=404)
+        except Exception as e:
+            print(f"Unexpected error in subject_chat_api: {str(e)}")  # Debug log
+            return JsonResponse({"error": f"Unexpected error: {str(e)}"}, status=500)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
 
 @login_required
 def assignments_list(request):
@@ -379,6 +593,9 @@ def submit_assignment(request, assignment_id):
     submission.score = int((correct_answers / total_questions) * 100)
     submission.completed = True
     submission.save()
+    
+    # Update dyslexia level based on progress
+    update_dyslexia_level(request.user)
     
     return JsonResponse({
         'status': 'success',

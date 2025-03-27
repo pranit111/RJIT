@@ -43,6 +43,6 @@ class SubjectMaterialAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
-
+admin.site.register(QuizAttempt)
 admin.site.register(Quiz, QuizAdmin)
 admin.site.register(Question, QuestionAdmin)

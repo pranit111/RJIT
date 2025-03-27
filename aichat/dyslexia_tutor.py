@@ -12,6 +12,7 @@ from langchain.tools import Tool
 from langchain.agents import initialize_agent, AgentType
 from langchain.memory import ConversationBufferMemory
 from langchain_core.caches import InMemoryCache
+import re
 
 class DyslexiaTutorAI:
     def __init__(self, google_api_key, data_path, persist_directory, embedding_model="sentence-transformers/all-MiniLM-L6-v2"):
@@ -23,6 +24,7 @@ class DyslexiaTutorAI:
         self.vector_db = None
         self.qa_chain = None
         self.tools = []
+        self.extracted_text = None
         
         # Initialize memory and cache
         self.cache = InMemoryCache()
@@ -33,30 +35,65 @@ class DyslexiaTutorAI:
 
     def _initialize_components(self):
         """Initialize all necessary components"""
-        # Extract and process text
-        text = self.extract_text_from_pdf(self.data_path)
-        docs = self.convert_to_documents([text])
-        chunks = self.split_text_into_chunks(docs)
-        
-        # Create vector database
-        self.download_hf_embeddings()
-        self.create_vector_db(chunks)
-        
-        # Setup QA chain
-        self.setup_qa_chain()
-        
-        # Initialize tools and agent
-        self.initialize_tools()
-        self.initialize_agent()
+        try:
+            # Extract and process text
+            self.extracted_text = self.extract_text_from_pdf(self.data_path)
+            if not self.extracted_text:
+                raise ValueError("No text could be extracted from the PDF")
+                
+            docs = self.convert_to_documents([self.extracted_text])
+            chunks = self.split_text_into_chunks(docs)
+            
+            # Create vector database
+            self.download_hf_embeddings()
+            self.create_vector_db(chunks)
+            
+            # Setup QA chain
+            self.setup_qa_chain()
+            
+            # Initialize tools and agent
+            self.initialize_tools()
+            self.initialize_agent()
+            
+        except Exception as e:
+            raise ValueError(f"Error initializing components: {str(e)}")
 
     def extract_text_from_pdf(self, pdf_path):
         """Extract text from a PDF file."""
-        text = ""
-        with open(pdf_path, "rb") as file:
-            reader = PyPDF2.PdfReader(file)
-            for page in reader.pages:
-                text += page.extract_text() + "\n"
-        return text
+        try:
+            text = ""
+            with open(pdf_path, "rb") as file:
+                reader = PyPDF2.PdfReader(file)
+                for page in reader.pages:
+                    text += page.extract_text() + "\n"
+            return text.strip()
+        except Exception as e:
+            raise ValueError(f"Error extracting text from PDF: {str(e)}")
+
+    def get_extracted_text(self):
+        """Return the extracted text from the PDF."""
+        if not self.extracted_text:
+            raise ValueError("No text has been extracted yet")
+        return self.extracted_text
+
+    def process_dyslexic_text(self, text):
+        """Process text to make it more dyslexia-friendly."""
+        # Define confusing character pairs and their replacements
+        confusing_pairs = {
+            r'([bd])': ('b/d', '#e91e63'),  # Red for b/d
+            r'([pq])': ('p/q', '#2196f3'),  # Blue for p/q
+            r'([oO])': ('o/O', '#4caf50'),  # Green for o/O
+        }
+        
+        processed_text = text
+        for pattern, (pair, color) in confusing_pairs.items():
+            processed_text = re.sub(
+                pattern,
+                f'<span class="confusing-pair" data-pair="{pair}" style="color: {color}">\\1</span>',
+                processed_text
+            )
+        
+        return processed_text
 
     def convert_to_documents(self, data):
         """Convert data into LangChain-compatible Document objects."""
@@ -73,39 +110,52 @@ class DyslexiaTutorAI:
 
     def create_vector_db(self, chunks):
         """Create and persist the vector database."""
-        self.vector_db = Chroma.from_documents(
-            documents=chunks, 
-            embedding=self.embeddings, 
-            persist_directory=self.persist_directory
-        )
-        self.vector_db.persist()
+        try:
+            self.vector_db = Chroma.from_documents(
+                documents=chunks, 
+                embedding=self.embeddings, 
+                persist_directory=self.persist_directory
+            )
+            self.vector_db.persist()
+        except Exception as e:
+            raise ValueError(f"Error creating vector database: {str(e)}")
 
     def setup_qa_chain(self):
         """Setup the QA chain with a strict prompt to use the provided context."""
-        system_prompt = """You are a specialized tutor for dyslexic students. You MUST:
-        1. Always use the provided textbook content to answer questions
-        2. Explain concepts using simple words, short sentences, and clear examples
-        3. Break down complex ideas into smaller, manageable parts
-        4. Use storytelling or relatable examples when possible
-        5. If the answer isn't in the textbook, say "I don't have that information in my materials"
-        
-        Textbook content: {context}"""
-        
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", "{input}")
-        ])
-        
-        model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", cache=self.cache)
-        question_answer_chain = create_stuff_documents_chain(model, prompt)
-        self.qa_chain = create_retrieval_chain(
-            self.vector_db.as_retriever(search_kwargs={'k': 10}),  # Reduced to 5 most relevant chunks
-            question_answer_chain
-        )
+        try:
+            system_prompt = """You are a specialized tutor for dyslexic students. You MUST:
+            1. Always use the provided textbook content to answer questions
+            2. Explain concepts using simple words, short sentences, and clear examples
+            3. Break down complex ideas into smaller, manageable parts
+            4. Use storytelling or relatable examples when possible
+            5. If the answer isn't in the textbook, say "I don't have that information in my materials"
+            6. When explaining text, highlight confusing character pairs (b/d, p/q, o/O)
+            7. Use visual aids and examples to reinforce concepts
+            
+            Textbook content: {context}"""
+            
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", system_prompt),
+                ("human", "{input}")
+            ])
+            
+            model = ChatGoogleGenerativeAI(model="gemini-1.5-flash", cache=self.cache)
+            question_answer_chain = create_stuff_documents_chain(model, prompt)
+            self.qa_chain = create_retrieval_chain(
+                self.vector_db.as_retriever(search_kwargs={'k': 10}),
+                question_answer_chain
+            )
+        except Exception as e:
+            raise ValueError(f"Error setting up QA chain: {str(e)}")
 
-    def query_textbook(self, user_query: str) -> str:
-        """Query the textbook content"""
-        result = self.qa_chain.invoke({"input": user_query})
+    def query_textbook(self, user_query: str, context: str = None) -> str:
+        """Query the textbook content with optional context"""
+        if context:
+            # Combine user query with context
+            enhanced_query = f"Context: {context}\n\nQuestion: {user_query}"
+            result = self.qa_chain.invoke({"input": enhanced_query})
+        else:
+            result = self.qa_chain.invoke({"input": user_query})
         return result["answer"]
 
     def comfort_student(self):
@@ -138,10 +188,11 @@ class DyslexiaTutorAI:
         custom_agent_prompt = """You are a dyslexia tutor. You MUST:
         1. ALWAYS use the Answer_From_Textbook tool first for any academic question
         2. Only use general responses if the textbook doesn't have the answer
-        3. Keep responses simple,detail and structured for dyslexic students
-        4. If the topic is complicated like math,science then explain it in story telling form
+        3. Keep responses simple, detailed and structured for dyslexic students
+        4. If the topic is complicated like math, science then explain it in story telling form
         5. Use the Comfort_Student tool when needed
-
+        6. Highlight confusing character pairs in your explanations
+        7. Use visual aids and examples to reinforce concepts
         
         Current conversation:
         {chat_history}
@@ -162,10 +213,14 @@ class DyslexiaTutorAI:
             }
         )
 
-    def process_query(self, user_query: str):
+    def process_query(self, user_query: str, context: str = None):
         """Process a user query ensuring textbook-based answers"""
         try:
-            response = self.agent.run(user_query)
+            if context:
+                # Include context in the query
+                response = self.agent.run(f"Context: {context}\n\nQuestion: {user_query}")
+            else:
+                response = self.agent.run(user_query)
             return response
         except Exception as e:
             return f"An error occurred: {str(e)}"

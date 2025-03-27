@@ -3,108 +3,230 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StudyBuddy - Your Learning Companion</title>
+    <title>StudyBuddy - {% block title %}{% endblock %}</title>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        :root {
+            --primary-color: #000000;
+            --secondary-color: #ffffff;
+            --accent-color: #333333;
+            --background-color: #f8f9fa;
+            --text-color: #212529;
+            --border-color: #dee2e6;
+            --hover-color: #f1f3f5;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+            --transition-speed: 0.3s;
+        }
+
+        * {
             margin: 0;
             padding: 0;
-            background-color: #f5f5f5;
-            min-height: 100vh;
+            box-sizing: border-box;
         }
 
-        nav {
-            background-color: #333;
-            padding: 1rem;
-            color: white;
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
         }
 
-        nav a {
-            color: white;
-            text-decoration: none;
-            padding: 0.5rem 1rem;
-            margin-right: 1rem;
+        .navbar {
+            background-color: var(--secondary-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
         }
 
-        nav a:hover {
-            background-color: #555;
-            border-radius: 4px;
-        }
-
-        .nav-container {
+        .navbar-container {
             max-width: 1200px;
             margin: 0 auto;
+            padding: 0 1rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .nav-brand {
+        .navbar-brand {
             font-size: 1.5rem;
-            font-weight: bold;
-        }
-
-        .nav-links {
+            font-weight: 700;
+            color: var(--primary-color);
+            text-decoration: none;
             display: flex;
             align-items: center;
+            gap: 0.5rem;
         }
 
-        .user-info {
-            margin-left: 1rem;
+        .navbar-brand i {
+            color: var(--accent-color);
         }
 
-        .user-info a {
-            color: #fff;
+        .navbar-nav {
+            display: flex;
+            gap: 1.5rem;
+            list-style: none;
+        }
+
+        .nav-link {
+            color: var(--text-color);
             text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: all var(--transition-speed) ease;
         }
 
-        main {
+        .nav-link:hover {
+            background-color: var(--hover-color);
+            color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--primary-color);
+            background-color: var(--hover-color);
+        }
+
+        .main-content {
             max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
+            margin: 6rem auto 2rem;
+            padding: 0 1rem;
         }
 
-        footer {
-            background-color: #333;
-            color: white;
-            text-align: center;
-            padding: 1rem;
-            position: fixed;
-            bottom: 0;
+        .card {
+            background-color: var(--secondary-color);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            border: none;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: var(--secondary-color);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-color);
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            color: var(--primary-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--hover-color);
+        }
+
+        .form-control {
             width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+            transition: border-color var(--transition-speed) ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        @media (max-width: 768px) {
+            .navbar-nav {
+                display: none;
+            }
+
+            .main-content {
+                margin-top: 5rem;
+            }
         }
     </style>
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <nav>
-        <div class="nav-container">
-            <div class="nav-brand">
-                <a href="{% url 'main:home' %}">StudyBuddy</a>
-            </div>
-            <div class="nav-links">
-                <a href="{% url 'main:home' %}">Home</a>
-                <a href="{% url 'main:about' %}">About</a>
-                <a href="{% url 'main:features' %}">Features</a>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="{% url 'main:home' %}" class="navbar-brand">
+                <i class="fas fa-graduation-cap"></i>
+                StudyBuddy
+            </a>
+            <ul class="navbar-nav">
                 {% if user.is_authenticated %}
-                    <div class="user-info">
-                        Welcome, {{ user.username }}! 
-                        <a href="{% url 'main:logout' %}">Logout</a>
-                    </div>
+                    <li><a href="{% url 'main:home' %}" class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">Home</a></li>
+                    <li><a href="{% url 'dyslexia:dashboard' %}" class="nav-link {% if 'dashboard' in request.path %}active{% endif %}">Dashboard</a></li>
+                    <li><a href="{% url 'dyslexia:quiz_list' %}" class="nav-link {% if 'quiz' in request.path %}active{% endif %}">Quizzes</a></li>
+                    <li><a href="{% url 'dyslexia:assignments_list' %}" class="nav-link {% if 'assignment' in request.path %}active{% endif %}">Assignments</a></li>
+                    <li><a href="{% url 'main:logout' %}" class="nav-link">Logout</a></li>
                 {% else %}
-                    <a href="{% url 'main:login' %}">Login</a>
-                    <a href="{% url 'main:register' %}">Register</a>
+                    <li><a href="{% url 'main:login' %}" class="nav-link {% if request.resolver_match.url_name == 'login' %}active{% endif %}">Login</a></li>
+                    <li><a href="{% url 'main:register' %}" class="nav-link {% if request.resolver_match.url_name == 'register' %}active{% endif %}">Register</a></li>
                 {% endif %}
-            </div>
+            </ul>
         </div>
     </nav>
 
-    <main>
-        {% block content %}
-        {% endblock %}
-    </main>
+    <div class="main-content">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
 
-    <footer>
-        <p>&copy; 2024 StudyBuddy. All rights reserved.</p>
-    </footer>
+        {% block content %}{% endblock %}
+    </div>
+
+    {% block extra_js %}{% endblock %}
 </body>
 </html> 

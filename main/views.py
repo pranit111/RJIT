@@ -42,7 +42,7 @@ def register(request):
             
             login(request, user)
             messages.success(request, 'Registration successful! Please complete your profile.')
-            return redirect('main:select_condition')
+            return redirect('main:login')
         else:
             messages.error(request, 'Registration failed. Please correct the errors.')
     else:

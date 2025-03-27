@@ -1,7 +1,195 @@
-{% extends 'main/base.html' %}
 {% load static %}
 
 {% block content %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get quiz ID from Django template
+    const quizId = "{{ quiz.id }}";
+    const questions = document.querySelectorAll('.question-card');
+    const prevButton = document.getElementById('prevQuestion');
+    const nextButton = document.getElementById('nextQuestion');
+    const submitButton = document.getElementById('submitQuiz');
+    const currentQuestionSpan = document.getElementById('currentQuestion');
+    const quizForm = document.getElementById('quizForm');
+    let currentQuestion = 0;
+    let responses = [];
+
+    // Initialize speech synthesis
+    const synth = window.speechSynthesis;
+    
+    // Function to speak text
+    function speakText(text) {
+        synth.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        synth.speak(utterance);
+    }
+
+    // Add click handlers for speak buttons
+    document.querySelectorAll('.speak-button, .speak-option').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const textToSpeak = this.dataset.text;
+            speakText(textToSpeak);
+        });
+    });
+
+    function showQuestion(index) {
+        if (index < 0 || index >= questions.length) return;
+        
+        currentQuestion = index;
+        questions.forEach((q, i) => {
+            q.style.display = i === index ? 'block' : 'none';
+        });
+        currentQuestionSpan.textContent = index + 1;
+        
+        // Update button states
+        prevButton.disabled = index === 0;
+        nextButton.style.display = index === questions.length - 1 ? 'none' : 'block';
+        submitButton.style.display = index === questions.length - 1 ? 'block' : 'none';
+
+        // Load saved response if exists
+        loadResponse();
+    }
+
+    function saveResponse() {
+        const question = questions[currentQuestion];
+        const selectedOption = question.querySelector('input[type="radio"]:checked');
+        
+        if (selectedOption) {
+            responses[currentQuestion] = {
+                question_id: question.dataset.question,
+                selected_option_id: selectedOption.value,
+                response_time: 0
+            };
+            console.log('Saved response for question', currentQuestion + 1, ':', responses[currentQuestion]);
+        }
+    }
+
+    function loadResponse() {
+        const question = questions[currentQuestion];
+        const savedResponse = responses[currentQuestion];
+        
+        if (savedResponse) {
+            const option = question.querySelector(`input[value="${savedResponse.selected_option_id}"]`);
+            if (option) {
+                option.checked = true;
+                option.closest('.option').classList.add('selected');
+                console.log('Loaded response for question', currentQuestion + 1);
+            }
+        }
+    }
+
+    // Navigation handlers
+    prevButton.addEventListener('click', function() {
+        saveResponse();
+        showQuestion(currentQuestion - 1);
+    });
+
+    nextButton.addEventListener('click', function() {
+        saveResponse();
+        showQuestion(currentQuestion + 1);
+    });
+
+    // Add event listeners for option selection
+    questions.forEach(question => {
+        question.querySelectorAll('.option').forEach(option => {
+            option.addEventListener('click', function(e) {
+                e.preventDefault();
+                const radio = option.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.checked = true;
+                    option.classList.add('selected');
+                    // Remove selected class from other options
+                    question.querySelectorAll('.option').forEach(opt => {
+                        if (opt !== option) {
+                            opt.classList.remove('selected');
+                        }
+                    });
+                    console.log('Option selected:', radio.value);
+                }
+            });
+        });
+    });
+
+    // Form submission handler
+    quizForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        console.log('Form submitted');
+        
+        // Save current response before submitting
+        saveResponse();
+
+        // Validate that all questions are answered
+        const unansweredQuestions = Array.from(questions).filter(question => {
+            return !question.querySelector('input[type="radio"]:checked');
+        });
+
+        if (unansweredQuestions.length > 0) {
+            alert('Please answer all questions before submitting.');
+            return;
+        }
+
+        // Collect all responses
+        const formResponses = Array.from(questions).map(question => {
+            const selectedOption = question.querySelector('input[type="radio"]:checked');
+            const questionId = parseInt(question.dataset.question);
+            const optionId = parseInt(selectedOption.value);
+            
+            console.log('Question ID:', questionId, 'Option ID:', optionId);
+            
+            return {
+                question_id: questionId,
+                selected_option_id: optionId,
+                response_time: 0
+            };
+        });
+
+        try {
+            // Disable submit button to prevent double submission
+            submitButton.disabled = true;
+            submitButton.textContent = 'Submitting...';
+
+            console.log('Sending responses:', formResponses);
+
+            const response = await fetch(`/dyslexia/quizzes/${quizId}/submit/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    responses: formResponses
+                })
+            });
+
+            const data = await response.json();
+            console.log('Submission response:', data);
+            
+            if (!response.ok) {
+                throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            }
+            
+            if (data.success && data.redirect_url) {
+                console.log('Redirecting to:', data.redirect_url);
+                window.location.href = data.redirect_url;
+            } else {
+                throw new Error(data.error || 'Submission failed');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error submitting quiz: ' + error.message);
+            submitButton.disabled = false;
+            submitButton.textContent = 'Submit Quiz';
+        }
+    });
+
+    // Show first question initially
+    showQuestion(0);
+});
+</script>
+
 <div class="quiz-container">
     <div class="quiz-header">
         <h1>{{ quiz.title }}</h1>
@@ -17,7 +205,7 @@
             {% csrf_token %}
             
             {% for question in quiz.questions.all %}
-            <div class="question-card" data-question="{{ forloop.counter }}">
+            <div class="question-card" data-question="{{ question.id }}">
                 <div class="question-header">
                     <span class="question-number">Question {{ forloop.counter }}</span>
                     <span class="question-type">{{ question.get_question_type_display }}</span>
@@ -192,98 +380,32 @@
         gap: 8px;
     }
 
-    .nav-button:disabled {
-        background: #ccc;
+    .submit-button {
+        background-color: #4caf50;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .submit-button:hover {
+        background-color: #45a049;
+    }
+
+    .submit-button:disabled {
+        background-color: #cccccc;
         cursor: not-allowed;
     }
 
-    .submit-button {
-        background: #28a745;
-        color: white;
-        border: none;
-        padding: 10px 30px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 1.1em;
+    .option.selected {
+        background-color: #e3f2fd;
+        border-color: #2196f3;
     }
 
     .question-progress {
         color: #666;
     }
 </style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const questions = document.querySelectorAll('.question-card');
-    const prevButton = document.getElementById('prevQuestion');
-    const nextButton = document.getElementById('nextButton');
-    const submitButton = document.getElementById('submitQuiz');
-    const currentQuestionSpan = document.getElementById('currentQuestion');
-    let currentQuestion = 0;
-
-    // Initialize speech synthesis
-    const synth = window.speechSynthesis;
-    
-    // Function to speak text
-    function speakText(text) {
-        synth.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 0.9;
-        utterance.pitch = 1;
-        synth.speak(utterance);
-    }
-
-    // Add click handlers for speak buttons
-    document.querySelectorAll('.speak-button, .speak-option').forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            const textToSpeak = this.dataset.text;
-            speakText(textToSpeak);
-        });
-    });
-
-    function showQuestion(index) {
-        questions.forEach((q, i) => {
-            q.style.display = i === index ? 'block' : 'none';
-        });
-        currentQuestionSpan.textContent = index + 1;
-        
-        // Update button states
-        prevButton.disabled = index === 0;
-        nextButton.style.display = index === questions.length - 1 ? 'none' : 'block';
-        submitButton.style.display = index === questions.length - 1 ? 'block' : 'none';
-    }
-
-    // Show first question initially
-    showQuestion(0);
-
-    // Navigation handlers
-    prevButton.addEventListener('click', () => {
-        if (currentQuestion > 0) {
-            currentQuestion--;
-            showQuestion(currentQuestion);
-        }
-    });
-
-    nextButton.addEventListener('click', () => {
-        if (currentQuestion < questions.length - 1) {
-            currentQuestion++;
-            showQuestion(currentQuestion);
-        }
-    });
-
-    // Form submission handler
-    document.getElementById('quizForm').addEventListener('submit', function(e) {
-        const unanswered = Array.from(questions).some(question => {
-            const inputs = question.querySelectorAll('input[type="radio"]');
-            return !Array.from(inputs).some(input => input.checked);
-        });
-
-        if (unanswered) {
-            e.preventDefault();
-            alert('Please answer all questions before submitting.');
-        }
-    });
-});
-</script>
 {% endblock %} 
